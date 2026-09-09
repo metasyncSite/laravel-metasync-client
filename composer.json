@@ -1,0 +1,41 @@
+{
+    "name": "metasyncsite/laravel-metasync-client",
+    "description": "Laravel client for MetaSync: sync page meta tags and redirects with the MetaSync SaaS",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "illuminate/console": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0",
+        "illuminate/database": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "MetaSyncClient\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MetaSyncClient\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "MetaSyncClient\\MetaSyncClientServiceProvider"
+            ],
+            "aliases": {
+                "MetaSync": "MetaSyncClient\\Facades\\MetaSync"
+            }
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
