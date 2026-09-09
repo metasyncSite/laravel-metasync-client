@@ -1,8 +1,8 @@
 # MetaSync Laravel Client
 
-Синхронізує мета-теги та редиректи вашого Laravel-сайту з [MetaSync](https://metasync.site).
+Syncs your Laravel site's meta tags and redirects with [MetaSync](https://metasync.site).
 
-## Встановлення
+## Installation
 
 ```bash
 composer require metasyncsite/laravel-metasync-client
@@ -13,12 +13,12 @@ php artisan migrate
 
 ```
 METASYNC_URL=https://app.metasync.site
-METASYNC_TOKEN=<токен проекту з MetaSync>
+METASYNC_TOKEN=<project token from MetaSync>
 ```
 
-## Підключення сторінок (обов'язково для push)
+## Exposing your pages (required for push)
 
-Реалізуйте контракт `PageCollector` — він віддає список сторінок сайту:
+Implement the `PageCollector` contract — it yields the site's pages:
 
 ```php
 use MetaSyncClient\Contracts\PageCollector;
@@ -42,26 +42,26 @@ class AppPageCollector implements PageCollector
 }
 ```
 
-І забіндіть у `AppServiceProvider::register()`:
+Then bind it in `AppServiceProvider::register()`:
 
 ```php
 $this->app->bind(PageCollector::class, AppPageCollector::class);
 ```
 
-## Команди
+## Commands
 
-| Команда | Опис |
+| Command | Description |
 |---|---|
-| `metasync:push [--dry-run]` | Відправити сторінки сайту в MetaSync |
-| `metasync:pull [--full]` | Стягнути змінені мета/редиректи в локальні таблиці |
+| `metasync:push [--dry-run]` | Push the site's pages to MetaSync |
+| `metasync:pull [--full]` | Pull edited meta and redirects into the local cache tables |
 | `metasync:sync` | push + pull |
-| `metasync:webhook [url] [--remove]` | Зареєструвати webhook для миттєвої доставки змін |
+| `metasync:webhook [url] [--remove]` | Register a webhook for instant change delivery |
 
-`metasync:pull` сам реєструється в шедулері кожні 15 хв як fallback, якщо webhook недоступний (вимкнути: `METASYNC_SCHEDULE_PULL=false`, змінити розклад: `METASYNC_SCHEDULE_CRON`).
+`metasync:pull` registers itself on the scheduler every 15 minutes as a fallback for when the webhook cannot reach the site (disable with `METASYNC_SCHEDULE_PULL=false`, change the schedule with `METASYNC_SCHEDULE_CRON`).
 
-## Рендер мета на сторінках
+## Rendering meta on pages
 
-Найпростіше — директива в `<head>` layout'а (виводить `<title>`, description і robots, нічого не рендерить для сторінок без запису):
+The simplest way is the directive in your layout's `<head>` — it outputs `<title>`, description and robots, and renders nothing for pages without an entry:
 
 ```blade
 <head>
@@ -69,10 +69,10 @@ $this->app->bind(PageCollector::class, AppPageCollector::class);
 </head>
 ```
 
-Або точково через фасад чи резолвер (шукає точну мову, фолбек на будь-яку; толерантний до trailing slash):
+Or resolve entries directly via the facade or resolver (prefers the exact language with a fallback to any; tolerates a trailing-slash mismatch):
 
 ```php
-$meta = MetaSync::forRequest();            // або app(\MetaSyncClient\MetaResolver::class)
+$meta = MetaSync::forRequest();            // or app(\MetaSyncClient\MetaResolver::class)
 $meta = MetaSync::forPath('/about', 'uk');
 ```
 
@@ -84,17 +84,17 @@ $meta = MetaSync::forPath('/about', 'uk');
 <h1>{{ $meta?->h1 ?? $product->name }}</h1>
 ```
 
-## Редиректи
+## Redirects
 
-Middleware `HandleRedirects` реєструється автоматично (вимкнути: `METASYNC_REDIRECTS=false`) і застосовує активні редиректи з MetaSync до всіх GET-запитів.
+The `HandleRedirects` middleware registers automatically (disable with `METASYNC_REDIRECTS=false`) and applies active redirects from MetaSync to all GET requests.
 
-## Миттєва доставка змін
+## Instant change delivery
 
-1. `php artisan metasync:webhook` — зареєструє `POST /metasync/webhook` у MetaSync і виведе секрет.
-2. Додайте `METASYNC_WEBHOOK_SECRET=...` в `.env`.
-3. Коли в MetaSync змінюють мета — сервіс пінгує сайт, пакет ставить у чергу pull, зміни застосовуються автоматично.
+1. `php artisan metasync:webhook` — registers `POST /metasync/webhook` in MetaSync and prints the secret.
+2. Add `METASYNC_WEBHOOK_SECRET=...` to your `.env`.
+3. When meta changes in MetaSync, the service pings your site, the package queues a pull and the changes apply automatically.
 
-## Тести
+## Tests
 
 ```bash
 composer install
