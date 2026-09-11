@@ -48,11 +48,36 @@ Then bind it in `AppServiceProvider::register()`:
 $this->app->bind(PageCollector::class, AppPageCollector::class);
 ```
 
+## Exposing your redirects (optional)
+
+If the site already has redirects, implement `RedirectCollector` the same way and `metasync:push` will import them into MetaSync so they can be managed there from then on. Redirects already known to MetaSync (same `from_path`) are never overwritten — MetaSync wins conflicts.
+
+```php
+use MetaSyncClient\Contracts\RedirectCollector;
+
+class AppRedirectCollector implements RedirectCollector
+{
+    public function collect(): iterable
+    {
+        foreach (Redirect::query()->cursor() as $redirect) {
+            yield [
+                'from_path' => $redirect->from,
+                'to_url' => $redirect->to,
+                'status_code' => $redirect->code, // 301 or 302
+                'is_active' => true,
+            ];
+        }
+    }
+}
+```
+
+Without a binding, push only sends pages.
+
 ## Commands
 
 | Command | Description |
 |---|---|
-| `metasync:push [--dry-run]` | Push the site's pages to MetaSync |
+| `metasync:push [--dry-run]` | Push the site's pages and redirects to MetaSync |
 | `metasync:pull [--full]` | Pull edited meta and redirects into the local cache tables |
 | `metasync:sync` | push + pull |
 | `metasync:webhook [url] [--remove]` | Register a webhook for instant change delivery |

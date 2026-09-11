@@ -42,6 +42,16 @@ class ApiClient
     }
 
     /**
+     * @param  list<array<string, mixed>>  $redirects
+     * @return array{new: int, existing: int, total: int, skipped: int}
+     */
+    public function pushRedirects(array $redirects): array
+    {
+        /** @var array{new: int, existing: int, total: int, skipped: int} */
+        return $this->json($this->http()->post('redirects/push', ['redirects' => $redirects]));
+    }
+
+    /**
      * @return array{data: list<array<string, mixed>>, next_after_id: int|null, server_time: string}
      */
     public function pullMeta(?string $updatedSince = null, ?int $afterId = null): array

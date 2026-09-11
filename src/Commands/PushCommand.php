@@ -5,12 +5,13 @@ namespace MetaSyncClient\Commands;
 use Illuminate\Console\Command;
 use MetaSyncClient\ApiClient;
 use MetaSyncClient\Contracts\PageCollector;
+use MetaSyncClient\Contracts\RedirectCollector;
 
 class PushCommand extends Command
 {
     protected $signature = 'metasync:push {--dry-run : List the pages without sending them}';
 
-    protected $description = 'Push the site\'s pages to MetaSync';
+    protected $description = 'Push the site\'s pages and redirects to MetaSync';
 
     public function handle(ApiClient $api): int
     {
@@ -31,8 +32,19 @@ class PushCommand extends Command
             $pages[] = $page;
         }
 
-        if ($pages === []) {
-            $this->info('Nothing to push: the collector returned no pages.');
+        $redirects = [];
+
+        if ($this->laravel->bound(RedirectCollector::class)) {
+            /** @var RedirectCollector $redirectCollector */
+            $redirectCollector = $this->laravel->make(RedirectCollector::class);
+
+            foreach ($redirectCollector->collect() as $redirect) {
+                $redirects[] = $redirect;
+            }
+        }
+
+        if ($pages === [] && $redirects === []) {
+            $this->info('Nothing to push: the collectors returned no pages or redirects.');
 
             return self::SUCCESS;
         }
@@ -42,25 +54,49 @@ class PushCommand extends Command
                 $this->line(($page['url_path'] ?? '?').' ['.($page['lang'] ?? 'uk').'] '.($page['title'] ?? ''));
             }
 
-            $this->info(count($pages).' pages would be pushed (dry run).');
+            foreach ($redirects as $redirect) {
+                $this->line(($redirect['from_path'] ?? '?').' → '.($redirect['to_url'] ?? '?').' ['.($redirect['status_code'] ?? 301).']');
+            }
+
+            $this->info(count($pages).' pages and '.count($redirects).' redirects would be pushed (dry run).');
 
             return self::SUCCESS;
         }
 
-        $total = ['new' => 0, 'updated' => 0, 'skipped' => 0];
+        if ($pages !== []) {
+            $total = ['new' => 0, 'updated' => 0, 'skipped' => 0];
 
-        foreach (array_chunk($pages, 500) as $chunk) {
-            $result = $api->pushPages($chunk);
+            foreach (array_chunk($pages, 500) as $chunk) {
+                $result = $api->pushPages($chunk);
 
-            $total['new'] += $result['new'];
-            $total['updated'] += $result['updated'];
-            $total['skipped'] += $result['skipped'] ?? 0;
+                $total['new'] += $result['new'];
+                $total['updated'] += $result['updated'];
+                $total['skipped'] += $result['skipped'] ?? 0;
+            }
+
+            $this->info(count($pages)." pages pushed — {$total['new']} new, {$total['updated']} updated.");
+
+            if ($total['skipped'] > 0) {
+                $this->warn("{$total['skipped']} pages were skipped: the MetaSync plan page limit is reached.");
+            }
         }
 
-        $this->info(count($pages)." pages pushed — {$total['new']} new, {$total['updated']} updated.");
+        if ($redirects !== []) {
+            $total = ['new' => 0, 'existing' => 0, 'skipped' => 0];
 
-        if ($total['skipped'] > 0) {
-            $this->warn("{$total['skipped']} pages were skipped: the MetaSync plan page limit is reached.");
+            foreach (array_chunk($redirects, 500) as $chunk) {
+                $result = $api->pushRedirects($chunk);
+
+                $total['new'] += $result['new'];
+                $total['existing'] += $result['existing'];
+                $total['skipped'] += $result['skipped'] ?? 0;
+            }
+
+            $this->info(count($redirects)." redirects pushed — {$total['new']} new, {$total['existing']} already known.");
+
+            if ($total['skipped'] > 0) {
+                $this->warn("{$total['skipped']} redirects were skipped: the MetaSync plan redirect limit is reached.");
+            }
         }
 
         return self::SUCCESS;
