@@ -94,6 +94,19 @@ The `HandleRedirects` middleware registers automatically (disable with `METASYNC
 2. Add `METASYNC_WEBHOOK_SECRET=...` to your `.env`.
 3. When meta changes in MetaSync, the service pings your site, the package queues a pull and the changes apply automatically.
 
+## Events
+
+After every pull that applied changes, the package fires `MetaSyncClient\Events\PullCompleted` with the MetaSync ids of the pages and redirects that were upserted into the local cache tables. Listen to it when your application keeps meta in its own models (a CMS, for example) and needs to copy the pulled values there:
+
+```php
+use MetaSyncClient\Events\PullCompleted;
+
+Event::listen(PullCompleted::class, function (PullCompleted $event) {
+    // $event->pageIds — remote ids, match them against metasync_pages.remote_id
+    // $event->redirectIds — same for metasync_redirects.remote_id
+});
+```
+
 ## Tests
 
 ```bash

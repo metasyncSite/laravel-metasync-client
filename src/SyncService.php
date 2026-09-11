@@ -4,6 +4,7 @@ namespace MetaSyncClient;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use MetaSyncClient\Events\PullCompleted;
 
 /**
  * Pulls pending meta and redirects from MetaSync into the local cache tables
@@ -29,6 +30,8 @@ class SyncService
 
         if ($pageIds !== [] || $redirectIds !== []) {
             $this->api->ack($pageIds, $redirectIds);
+
+            event(new PullCompleted($pageIds, $redirectIds));
         }
 
         return ['pages' => count($pageIds), 'redirects' => count($redirectIds)];
