@@ -14,7 +14,7 @@ interface PageCollector
      * @return iterable<array{
      *     url_path: string,
      *     lang?: string,
-     *     page_type?: string,
+     *     page_type?: string|null,
      *     title?: string|null,
      *     description?: string|null,
      *     h1?: string|null,
