@@ -41,8 +41,9 @@ class MetaResolver
     }
 
     /**
-     * <title>, description and robots tags for the page. Renders nothing
-     * when the page has no entry, so host defaults stay in place.
+     * <title>, description, robots, Open Graph, canonical, hreflang and
+     * JSON-LD tags for the page. Renders nothing when the page has no
+     * entry, so host defaults stay in place.
      */
     public function head(?string $path = null, ?string $lang = null): HtmlString
     {
@@ -66,7 +67,52 @@ class MetaResolver
             $tags[] = '<meta name="robots" content="noindex, nofollow">';
         }
 
+        if (! empty($meta->canonical_url)) {
+            $tags[] = '<link rel="canonical" href="'.e($meta->canonical_url).'">';
+        }
+
+        if (! empty($meta->og_title)) {
+            $tags[] = '<meta property="og:title" content="'.e($meta->og_title).'">';
+        }
+
+        if (! empty($meta->og_description)) {
+            $tags[] = '<meta property="og:description" content="'.e($meta->og_description).'">';
+        }
+
+        if (! empty($meta->og_image)) {
+            $tags[] = '<meta property="og:image" content="'.e($meta->og_image).'">';
+        }
+
+        foreach ($this->decodeJson($meta->hreflang ?? null) as $hreflang => $href) {
+            if (is_string($hreflang) && is_string($href)) {
+                $tags[] = '<link rel="alternate" hreflang="'.e($hreflang).'" href="'.e($href).'">';
+            }
+        }
+
+        $schema = $this->decodeJson($meta->schema_json ?? null);
+
+        if ($schema !== []) {
+            $json = (string) json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            // Guard against markup breaking out of the script element.
+            $json = str_ireplace('</script', '<\/script', $json);
+            $tags[] = '<script type="application/ld+json">'.$json.'</script>';
+        }
+
         return new HtmlString(implode("\n", $tags));
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function decodeJson(?string $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function lookup(string $path, string $lang): ?object

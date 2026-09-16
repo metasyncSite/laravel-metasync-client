@@ -33,6 +33,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | 404 reporting
+    |--------------------------------------------------------------------------
+    | When enabled, the redirects middleware buffers 404 hits locally and the
+    | next `metasync:pull` reports them to MetaSync, where they can be turned
+    | into redirects.
+    */
+    'report_404' => env('METASYNC_REPORT_404', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Scheduled pull
     |--------------------------------------------------------------------------
     | When enabled, `metasync:pull` self-registers on the scheduler as a

@@ -84,9 +84,11 @@ Without a binding, push only sends pages.
 
 `metasync:pull` registers itself on the scheduler every 15 minutes as a fallback for when the webhook cannot reach the site (disable with `METASYNC_SCHEDULE_PULL=false`, change the schedule with `METASYNC_SCHEDULE_CRON`).
 
+Entries deleted in MetaSync arrive in the pull feed with a `deleted` flag and are removed from the local cache tables, so redirects stop firing and cached meta disappears without any manual cleanup. A `--full` pull is authoritative: it also drops any local rows the server no longer knows about.
+
 ## Rendering meta on pages
 
-The simplest way is the directive in your layout's `<head>` — it outputs `<title>`, description and robots, and renders nothing for pages without an entry:
+The simplest way is the directive in your layout's `<head>` — it outputs `<title>`, description, robots, Open Graph tags, the canonical link, hreflang alternates and JSON-LD markup, and renders nothing for pages without an entry:
 
 ```blade
 <head>
@@ -109,9 +111,15 @@ $meta = MetaSync::forPath('/about', 'uk');
 <h1>{{ $meta?->h1 ?? $product->name }}</h1>
 ```
 
+Extended fields synced from MetaSync are also available on the resolved entry: `og_title`, `og_description`, `og_image`, `canonical_url`, plus JSON-encoded `hreflang` (a `lang => URL` map) and `schema_json` (a JSON-LD object).
+
 ## Redirects
 
 The `HandleRedirects` middleware registers automatically (disable with `METASYNC_REDIRECTS=false`) and applies active redirects from MetaSync to all GET requests.
+
+## 404 reporting
+
+When a GET request falls through to a 404, the middleware buffers the path (with hit counter and first referer) in the local `metasync_not_found` table — no HTTP calls on the request path. The next `metasync:pull` reports the buffered hits to MetaSync (`POST /api/v1/errors/404`) and clears them; in MetaSync they appear on the Redirects screen where a redirect can be created in one click. Disable with `METASYNC_REPORT_404=false`.
 
 ## Instant change delivery
 
@@ -129,6 +137,8 @@ use MetaSyncClient\Events\PullCompleted;
 Event::listen(PullCompleted::class, function (PullCompleted $event) {
     // $event->pageIds — remote ids, match them against metasync_pages.remote_id
     // $event->redirectIds — same for metasync_redirects.remote_id
+    // $event->deletedPageIds / $event->deletedRedirectIds — remote ids whose
+    // rows were just removed from the local cache (deleted in MetaSync)
 });
 ```
 

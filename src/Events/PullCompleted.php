@@ -12,9 +12,13 @@ class PullCompleted
     /**
      * @param list<int> $pageIds MetaSync page ids upserted into `metasync_pages`
      * @param list<int> $redirectIds MetaSync redirect ids upserted into `metasync_redirects`
+     * @param list<int> $deletedPageIds MetaSync page ids removed from `metasync_pages`
+     * @param list<int> $deletedRedirectIds MetaSync redirect ids removed from `metasync_redirects`
      */
     public function __construct(
         public readonly array $pageIds,
         public readonly array $redirectIds,
+        public readonly array $deletedPageIds = [],
+        public readonly array $deletedRedirectIds = [],
     ) {}
 }

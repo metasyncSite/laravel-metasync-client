@@ -90,6 +90,16 @@ class ApiClient
     }
 
     /**
+     * @param  list<array{path: string, count?: int, referer?: string}>  $hits
+     * @return array{accepted: int}
+     */
+    public function reportNotFound(array $hits): array
+    {
+        /** @var array{accepted: int} */
+        return $this->json($this->http()->post('errors/404', ['hits' => $hits]));
+    }
+
+    /**
      * @return array{registered: bool, secret: string|null}
      */
     public function registerWebhook(?string $url): array
