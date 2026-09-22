@@ -127,6 +127,12 @@ When a GET request falls through to a 404, the middleware buffers the path (with
 2. Add `METASYNC_WEBHOOK_SECRET=...` to your `.env`.
 3. When meta changes in MetaSync, the service pings your site, the package queues a pull and the changes apply automatically.
 
+## IndexNow
+
+Enable IndexNow for the project on MetaSync's Indexing screen. MetaSync then notifies Bing, Yandex, Naver, Seznam and Yep every time this site applies changed meta or new redirects, and after a "Submit all" from the screen.
+
+The search engines verify ownership by fetching `https://<your-site>/<key>.txt`. The package serves that file automatically: it reads the key from `GET /api/v1/project`, caches it for an hour and re-checks once a minute when an unknown key is requested, so a regenerated key is picked up quickly. Keys are 32 hex characters, so the route never shadows `robots.txt`, `security.txt` or similar files. Set `METASYNC_INDEXNOW=false` to not register the route.
+
 ## Events
 
 After every pull that applied changes, the package fires `MetaSyncClient\Events\PullCompleted` with the MetaSync ids of the pages and redirects that were upserted into the local cache tables. Listen to it when your application keeps meta in its own models (a CMS, for example) and needs to copy the pulled values there:

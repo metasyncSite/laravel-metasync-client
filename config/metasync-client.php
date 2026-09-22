@@ -24,6 +24,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | IndexNow key file
+    |--------------------------------------------------------------------------
+    | When IndexNow is enabled for the project in MetaSync, the package serves
+    | the ownership key at /<key>.txt (keys are 32 hex characters) so Bing,
+    | Yandex, Naver, Seznam and Yep accept the URLs MetaSync submits for you.
+    */
+    'indexnow_enabled' => env('METASYNC_INDEXNOW', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Redirects middleware
     |--------------------------------------------------------------------------
     | When enabled, the package registers a global middleware that applies

@@ -11,6 +11,7 @@ use MetaSyncClient\Commands\PullCommand;
 use MetaSyncClient\Commands\PushCommand;
 use MetaSyncClient\Commands\SyncCommand;
 use MetaSyncClient\Commands\WebhookCommand;
+use MetaSyncClient\Http\IndexNowKeyController;
 use MetaSyncClient\Http\WebhookController;
 use MetaSyncClient\Middleware\HandleRedirects;
 
@@ -23,6 +24,7 @@ class MetaSyncClientServiceProvider extends ServiceProvider
         $this->app->singleton(ApiClient::class);
         $this->app->singleton(SyncService::class);
         $this->app->singleton(MetaResolver::class);
+        $this->app->singleton(IndexNowKey::class);
     }
 
     public function boot(): void
@@ -36,6 +38,14 @@ class MetaSyncClientServiceProvider extends ServiceProvider
         Route::post((string) config('metasync-client.webhook_path'), WebhookController::class)
             ->middleware('api')
             ->name('metasync.webhook');
+
+        // IndexNow ownership check: MetaSync issues 32 hex character keys, so
+        // the pattern never shadows robots.txt, security.txt and the like.
+        if (config('metasync-client.indexnow_enabled')) {
+            Route::get('{key}.txt', IndexNowKeyController::class)
+                ->where('key', '[a-f0-9]{32}')
+                ->name('metasync.indexnow-key');
+        }
 
         Blade::directive('metasyncHead', fn (): string => "<?php echo app(\MetaSyncClient\MetaResolver::class)->head(); ?>");
 
