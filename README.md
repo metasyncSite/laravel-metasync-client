@@ -117,9 +117,19 @@ Extended fields synced from MetaSync are also available on the resolved entry: `
 
 The `HandleRedirects` middleware registers automatically (disable with `METASYNC_REDIRECTS=false`) and applies active redirects from MetaSync to all GET requests.
 
+## Alias domains (drop domains, old brands)
+
+Extra hostnames added on MetaSync's "Domains" screen — a bought drop domain, a previous brand, a merged site — arrive with `GET /api/v1/project` (`data.domains`) and are mirrored into the local `metasync_domains` table on every pull. Point the DNS of such a domain at this site and the middleware handles its requests:
+
+1. A redirect defined for that host in MetaSync (the pull feed carries `host` per redirect) wins.
+2. Anything else goes to the alias `fallback_url`, or to the same path on the project domain when no fallback is set, with the alias status code (301 by default).
+3. The unmatched path is buffered in `metasync_not_found` with the alias host and reported on the next pull, so MetaSync can suggest a one-to-one redirect for it.
+
+Redirects without a host (`host: null` in the feed, `''` locally) apply to the site's own domain only. Run `php artisan migrate` after upgrading to 1.5 — it adds `metasync_domains` and the `host` columns.
+
 ## 404 reporting
 
-When a GET request falls through to a 404, the middleware buffers the path (with hit counter and first referer) in the local `metasync_not_found` table — no HTTP calls on the request path. The next `metasync:pull` reports the buffered hits to MetaSync (`POST /api/v1/errors/404`) and clears them; in MetaSync they appear on the Redirects screen where a redirect can be created in one click. Disable with `METASYNC_REPORT_404=false`.
+When a GET request falls through to a 404, the middleware buffers the path (with hit counter and first referer) in the local `metasync_not_found` table — no HTTP calls on the request path. The next `metasync:pull` reports the buffered hits to MetaSync (`POST /api/v1/errors/404`, with `host` for alias-domain paths) and clears them; in MetaSync they appear on the Redirects screen where a redirect can be created in one click. Disable with `METASYNC_REPORT_404=false`.
 
 ## Instant change delivery
 

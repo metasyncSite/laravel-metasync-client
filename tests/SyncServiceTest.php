@@ -16,6 +16,7 @@ class SyncServiceTest extends TestCase
     public function test_pull_stores_meta_and_redirects_and_acknowledges(): void
     {
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [
                     ['id' => 11, 'url_path' => '/about', 'lang' => 'uk', 'title' => 'Про нас', 'description' => 'Опис', 'h1' => 'H1', 'noindex' => false, 'meta_updated_at' => '2026-09-09T10:00:00+00:00'],
@@ -56,6 +57,7 @@ class SyncServiceTest extends TestCase
         Event::fake([PullCompleted::class]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [['id' => 11, 'url_path' => '/about', 'lang' => 'uk', 'title' => 'Про нас']],
                 'next_after_id' => null,
@@ -81,6 +83,7 @@ class SyncServiceTest extends TestCase
         Event::fake([PullCompleted::class]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/*' => Http::response([
                 'data' => [], 'next_after_id' => null, 'server_time' => '2026-09-09T12:00:00+00:00',
             ]),
@@ -114,6 +117,7 @@ class SyncServiceTest extends TestCase
         ]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [['id' => 11, 'url_path' => '/about', 'lang' => 'uk', 'deleted' => true]],
                 'next_after_id' => null,
@@ -162,6 +166,7 @@ class SyncServiceTest extends TestCase
         ]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [], 'next_after_id' => null, 'server_time' => '2026-09-09T10:05:00+00:00',
             ]),
@@ -204,6 +209,7 @@ class SyncServiceTest extends TestCase
         ]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [['id' => 11, 'url_path' => '/about', 'lang' => 'uk', 'title' => 'Про нас']],
                 'next_after_id' => null,
@@ -234,6 +240,7 @@ class SyncServiceTest extends TestCase
         ]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [['id' => 11, 'url_path' => '/about', 'lang' => 'uk', 'title' => 'Нова назва']],
                 'next_after_id' => null,
@@ -256,6 +263,7 @@ class SyncServiceTest extends TestCase
         Cache::forever('metasync:last_pull', '2026-09-09T10:05:00+00:00');
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/*' => Http::response([
                 'data' => [], 'next_after_id' => null, 'server_time' => '2026-09-09T12:00:00+00:00',
             ]),
@@ -283,6 +291,7 @@ class SyncServiceTest extends TestCase
     public function test_pull_stores_extended_meta(): void
     {
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [[
                     'id' => 11,
@@ -322,6 +331,7 @@ class SyncServiceTest extends TestCase
         ]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/meta/pull*' => Http::response([
                 'data' => [], 'next_after_id' => null, 'server_time' => '2026-09-12T10:05:00+00:00',
             ]),
@@ -353,6 +363,7 @@ class SyncServiceTest extends TestCase
         ]);
 
         Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => ['domain' => 'site.test', 'domains' => []]]),
             'https://metasync.test/api/v1/*' => Http::response([
                 'data' => [], 'next_after_id' => null, 'server_time' => '2026-09-12T10:05:00+00:00',
             ]),
@@ -362,5 +373,61 @@ class SyncServiceTest extends TestCase
 
         Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'errors/404'));
         $this->assertSame(1, DB::table('metasync_not_found')->count());
+    }
+
+    public function test_pull_mirrors_alias_domains_and_host_specific_redirects(): void
+    {
+        DB::table('metasync_domains')->insert(['host' => 'stale.test', 'status_code' => 301, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        Http::fake([
+            'https://metasync.test/api/v1/project' => Http::response(['data' => [
+                'domain' => 'www.Site.test',
+                'domains' => [
+                    ['host' => 'old-brand.test', 'fallback_url' => 'https://site.test/welcome', 'status_code' => 301, 'is_active' => true],
+                    ['host' => 'paused.test', 'fallback_url' => null, 'status_code' => 302, 'is_active' => false],
+                ],
+            ]]),
+            'https://metasync.test/api/v1/meta/pull*' => Http::response(['data' => [], 'next_after_id' => null, 'server_time' => '2026-09-09T10:05:00+00:00']),
+            'https://metasync.test/api/v1/redirects/pull*' => Http::response([
+                'data' => [
+                    ['id' => 5, 'host' => null, 'from_path' => '/old', 'to_url' => 'https://site.test/new'],
+                    ['id' => 6, 'host' => 'old-brand.test', 'from_path' => '/old', 'to_url' => 'https://site.test/other'],
+                ],
+                'next_after_id' => null,
+                'server_time' => '2026-09-09T10:05:00+00:00',
+            ]),
+            'https://metasync.test/api/v1/sync/ack' => Http::response(['ok' => true]),
+        ]);
+
+        app(SyncService::class)->pull();
+
+        $this->assertSame('site.test', SyncService::projectDomain());
+        $this->assertSame(['old-brand.test', 'paused.test'], DB::table('metasync_domains')->orderBy('host')->pluck('host')->all());
+        $this->assertSame('https://site.test/welcome', DB::table('metasync_domains')->where('host', 'old-brand.test')->value('fallback_url'));
+        $this->assertFalse((bool) DB::table('metasync_domains')->where('host', 'paused.test')->value('is_active'));
+
+        $this->assertSame('', DB::table('metasync_redirects')->where('remote_id', 5)->value('host'));
+        $this->assertSame('old-brand.test', DB::table('metasync_redirects')->where('remote_id', 6)->value('host'));
+        $this->assertSame(2, DB::table('metasync_redirects')->where('from_path', '/old')->count());
+    }
+
+    public function test_404_report_includes_the_alias_host(): void
+    {
+        DB::table('metasync_not_found')->insert([
+            ['host' => 'old-brand.test', 'path' => '/gone', 'hits' => 2, 'referer' => null, 'created_at' => now(), 'updated_at' => now()],
+            ['host' => '', 'path' => '/gone', 'hits' => 1, 'referer' => null, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        Http::fake(['https://metasync.test/api/v1/errors/404' => Http::response(['accepted' => 2])]);
+
+        app(SyncService::class)->reportNotFound();
+
+        Http::assertSent(function (Request $request): bool {
+            $hits = $request['hits'];
+
+            return count($hits) === 2
+                && $hits[0]['host'] === 'old-brand.test'
+                && ! array_key_exists('host', $hits[1]);
+        });
     }
 }

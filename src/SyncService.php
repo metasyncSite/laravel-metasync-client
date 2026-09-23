@@ -17,6 +17,8 @@ class SyncService
 {
     private const string CURSOR_KEY = 'metasync:last_pull';
 
+    private const string DOMAIN_KEY = 'metasync:project_domain';
+
     public function __construct(private readonly ApiClient $api) {}
 
     /**
@@ -25,6 +27,8 @@ class SyncService
     public function pull(bool $full = false): array
     {
         $since = $full ? null : Cache::get(self::CURSOR_KEY);
+
+        $this->pullDomains();
 
         ['applied' => $pageIds, 'deleted' => $deletedPageIds] = $this->pullPages($since);
         ['applied' => $redirectIds, 'deleted' => $deletedRedirectIds] = $this->pullRedirects($since);
@@ -71,6 +75,7 @@ class SyncService
 
             $this->api->reportNotFound($rows->map(fn (object $row): array => array_filter([
                 'path' => $row->path,
+                'host' => isset($row->host) && $row->host !== '' ? $row->host : null,
                 'count' => (int) $row->hits,
                 'referer' => $row->referer,
             ], fn ($value) => $value !== null))->all());
@@ -81,6 +86,58 @@ class SyncService
         } while ($rows->count() === 500);
 
         return $reported;
+    }
+
+    /**
+     * The project's own domain as MetaSync knows it — the target for alias
+     * traffic without a fallback URL. Null until the first pull.
+     */
+    public static function projectDomain(): ?string
+    {
+        $domain = Cache::get(self::DOMAIN_KEY);
+
+        return is_string($domain) && $domain !== '' ? $domain : null;
+    }
+
+    /**
+     * Mirror the alias hosts from the project info into metasync_domains so
+     * the redirects middleware can recognise them without API calls.
+     */
+    private function pullDomains(): void
+    {
+        if (! Schema::hasTable('metasync_domains')) {
+            return;
+        }
+
+        $info = $this->api->projectInfo();
+        $data = (array) ($info['data'] ?? []);
+
+        if (is_string($data['domain'] ?? null) && $data['domain'] !== '') {
+            Cache::forever(self::DOMAIN_KEY, strtolower((string) preg_replace('/^www\./i', '', $data['domain'])));
+        }
+
+        $hosts = [];
+
+        foreach ((array) ($data['domains'] ?? []) as $alias) {
+            if (! is_array($alias) || ! is_string($alias['host'] ?? null) || $alias['host'] === '') {
+                continue;
+            }
+
+            $hosts[] = $alias['host'];
+
+            DB::table('metasync_domains')->updateOrInsert(
+                ['host' => $alias['host']],
+                [
+                    'fallback_url' => $alias['fallback_url'] ?? null,
+                    'status_code' => (int) ($alias['status_code'] ?? 301),
+                    'is_active' => (bool) ($alias['is_active'] ?? true),
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ],
+            );
+        }
+
+        DB::table('metasync_domains')->whereNotIn('host', $hosts)->delete();
     }
 
     /**
@@ -156,6 +213,7 @@ class SyncService
         $ids = [];
         $deletedIds = [];
         $afterId = null;
+        $hostAware = Schema::hasTable('metasync_domains');
 
         do {
             $response = $this->api->pullRedirects($since, $afterId);
@@ -169,24 +227,28 @@ class SyncService
                     continue;
                 }
 
+                $host = is_string($row['host'] ?? null) ? $row['host'] : '';
+
                 // MetaSync may hard-delete a trashed redirect and reissue the
                 // path under a new id; clear the stale twin or the unique
-                // index on from_path rejects the upsert.
+                // index on (host, from_path) rejects the upsert.
                 DB::table('metasync_redirects')
                     ->where('from_path', $row['from_path'])
+                    ->when($hostAware, fn ($query) => $query->where('host', $host))
                     ->where('remote_id', '!=', $row['id'])
                     ->delete();
 
                 DB::table('metasync_redirects')->updateOrInsert(
                     ['remote_id' => $row['id']],
-                    [
+                    array_filter([
+                        'host' => $hostAware ? $host : null,
                         'from_path' => $row['from_path'],
                         'to_url' => $row['to_url'],
                         'status_code' => (int) ($row['status_code'] ?? 301),
                         'is_active' => (bool) ($row['is_active'] ?? true),
                         'updated_at' => now(),
                         'created_at' => now(),
-                    ],
+                    ], fn ($value) => $value !== null),
                 );
 
                 $ids[] = (int) $row['id'];
