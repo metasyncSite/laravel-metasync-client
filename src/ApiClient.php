@@ -33,12 +33,16 @@ class ApiClient
 
     /**
      * @param  list<array<string, mixed>>  $pages
-     * @return array{new: int, updated: int, total: int, skipped: int}
+     * @param  bool  $force  overwrite meta already edited in MetaSync with the site's values
+     * @return array{new: int, updated: int, overwritten?: int, total: int, skipped: int}
      */
-    public function pushPages(array $pages): array
+    public function pushPages(array $pages, bool $force = false): array
     {
-        /** @var array{new: int, updated: int, total: int, skipped: int} */
-        return $this->json($this->http()->post('pages/push', ['pages' => $pages]));
+        /** @var array{new: int, updated: int, overwritten?: int, total: int, skipped: int} */
+        return $this->json($this->http()->post('pages/push', array_filter([
+            'pages' => $pages,
+            'force' => $force ?: null,
+        ])));
     }
 
     /**

@@ -6,13 +6,13 @@ use Illuminate\Console\Command;
 
 class SyncCommand extends Command
 {
-    protected $signature = 'metasync:sync';
+    protected $signature = 'metasync:sync {--force : Overwrite meta already edited in MetaSync with the site\'s current values}';
 
     protected $description = 'Full sync: push the site\'s pages, then pull pending changes from MetaSync';
 
     public function handle(): int
     {
-        $push = $this->call('metasync:push');
+        $push = $this->call('metasync:push', ['--force' => (bool) $this->option('force')]);
 
         if ($push !== self::SUCCESS) {
             return $push;

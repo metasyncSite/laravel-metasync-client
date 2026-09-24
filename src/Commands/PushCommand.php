@@ -9,7 +9,9 @@ use MetaSyncClient\Contracts\RedirectCollector;
 
 class PushCommand extends Command
 {
-    protected $signature = 'metasync:push {--dry-run : List the pages without sending them}';
+    protected $signature = 'metasync:push
+        {--dry-run : List the pages without sending them}
+        {--force : Overwrite meta already edited in MetaSync with the site\'s current values}';
 
     protected $description = 'Push the site\'s pages and redirects to MetaSync';
 
@@ -64,17 +66,23 @@ class PushCommand extends Command
         }
 
         if ($pages !== []) {
-            $total = ['new' => 0, 'updated' => 0, 'skipped' => 0];
+            $force = (bool) $this->option('force');
+            $total = ['new' => 0, 'updated' => 0, 'overwritten' => 0, 'skipped' => 0];
 
             foreach (array_chunk($pages, 500) as $chunk) {
-                $result = $api->pushPages($chunk);
+                $result = $api->pushPages($chunk, $force);
 
                 $total['new'] += $result['new'];
                 $total['updated'] += $result['updated'];
+                $total['overwritten'] += $result['overwritten'] ?? 0;
                 $total['skipped'] += $result['skipped'] ?? 0;
             }
 
             $this->info(count($pages)." pages pushed — {$total['new']} new, {$total['updated']} updated.");
+
+            if ($force) {
+                $this->warn("{$total['overwritten']} pages edited in MetaSync were overwritten with the site's values (force push).");
+            }
 
             if ($total['skipped'] > 0) {
                 $this->warn("{$total['skipped']} pages were skipped: the MetaSync plan page limit is reached.");

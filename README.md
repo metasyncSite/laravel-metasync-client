@@ -77,10 +77,12 @@ Without a binding, push only sends pages.
 
 | Command | Description |
 |---|---|
-| `metasync:push [--dry-run]` | Push the site's pages and redirects to MetaSync |
+| `metasync:push [--dry-run] [--force]` | Push the site's pages and redirects to MetaSync |
 | `metasync:pull [--full]` | Pull edited meta and redirects into the local cache tables |
-| `metasync:sync` | push + pull |
+| `metasync:sync [--force]` | push + pull |
 | `metasync:webhook [url] [--remove]` | Register a webhook for instant change delivery |
+
+A plain push never overwrites meta that was edited in MetaSync — MetaSync wins conflicts, so the site cannot undo an editor's work by accident. When the site really is the source of truth (a fix applied directly in the site's database, a bulk correction, a typo such as a Cyrillic letter replaced with its Latin twin that a normal push silently keeps), run `metasync:push --force`: the site's values replace the MetaSync edits for every pushed page, each overwrite is recorded in the project's change log, and the affected pages leave the pull feed since the site already renders them. Redirects are not affected by `--force`: existing redirects are still never touched.
 
 `metasync:pull` registers itself on the scheduler every 15 minutes as a fallback for when the webhook cannot reach the site (disable with `METASYNC_SCHEDULE_PULL=false`, change the schedule with `METASYNC_SCHEDULE_CRON`).
 

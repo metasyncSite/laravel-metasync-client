@@ -35,6 +35,48 @@ class PushCommandTest extends TestCase
         Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'redirects/push'));
     }
 
+    public function test_push_does_not_send_force_flag_by_default(): void
+    {
+        Http::fake([
+            'https://metasync.test/api/v1/pages/push' => Http::response(['new' => 0, 'updated' => 1, 'total' => 1, 'skipped' => 0]),
+        ]);
+
+        $this->artisan('metasync:push')
+            ->doesntExpectOutputToContain('force push')
+            ->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'pages/push')
+            && ! array_key_exists('force', $request->data()));
+    }
+
+    public function test_force_push_sends_flag_and_reports_overwrites(): void
+    {
+        Http::fake([
+            'https://metasync.test/api/v1/pages/push' => Http::response(['new' => 0, 'updated' => 1, 'overwritten' => 1, 'total' => 1, 'skipped' => 0]),
+        ]);
+
+        $this->artisan('metasync:push --force')
+            ->expectsOutputToContain('1 pages pushed')
+            ->expectsOutputToContain("1 pages edited in MetaSync were overwritten with the site's values (force push).")
+            ->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'pages/push')
+            && $request['force'] === true
+            && $request['pages'][0]['url_path'] === '/about');
+    }
+
+    public function test_sync_passes_force_to_push(): void
+    {
+        Http::fake([
+            'https://metasync.test/api/v1/pages/push' => Http::response(['new' => 0, 'updated' => 1, 'overwritten' => 0, 'total' => 1, 'skipped' => 0]),
+            'https://metasync.test/api/v1/*' => Http::response(['data' => [], 'next_after_id' => null, 'server_time' => now()->toIso8601String()]),
+        ]);
+
+        $this->artisan('metasync:sync --force')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'pages/push') && $request['force'] === true);
+    }
+
     public function test_push_sends_redirects_when_collector_is_bound(): void
     {
         $this->app->bind(RedirectCollector::class, fn () => new class implements RedirectCollector
