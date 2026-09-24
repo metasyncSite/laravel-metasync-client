@@ -68,9 +68,14 @@ class PushCommand extends Command
         if ($pages !== []) {
             $force = (bool) $this->option('force');
             $total = ['new' => 0, 'updated' => 0, 'overwritten' => 0, 'skipped' => 0];
+            $forceSupported = true;
 
             foreach (array_chunk($pages, 500) as $chunk) {
                 $result = $api->pushPages($chunk, $force);
+
+                if ($force && ! array_key_exists('overwritten', $result)) {
+                    $forceSupported = false;
+                }
 
                 $total['new'] += $result['new'];
                 $total['updated'] += $result['updated'];
@@ -80,7 +85,9 @@ class PushCommand extends Command
 
             $this->info(count($pages)." pages pushed — {$total['new']} new, {$total['updated']} updated.");
 
-            if ($force) {
+            if ($force && ! $forceSupported) {
+                $this->error('The MetaSync server ignored --force: it predates force push. Update MetaSync and run the command again.');
+            } elseif ($force) {
                 $this->warn("{$total['overwritten']} pages edited in MetaSync were overwritten with the site's values (force push).");
             }
 

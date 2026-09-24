@@ -65,6 +65,18 @@ class PushCommandTest extends TestCase
             && $request['pages'][0]['url_path'] === '/about');
     }
 
+    public function test_force_push_warns_when_server_does_not_support_it(): void
+    {
+        Http::fake([
+            'https://metasync.test/api/v1/pages/push' => Http::response(['new' => 0, 'updated' => 1, 'total' => 1, 'skipped' => 0]),
+        ]);
+
+        $this->artisan('metasync:push --force')
+            ->expectsOutputToContain('The MetaSync server ignored --force')
+            ->doesntExpectOutputToContain('force push).')
+            ->assertSuccessful();
+    }
+
     public function test_sync_passes_force_to_push(): void
     {
         Http::fake([
