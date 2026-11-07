@@ -11,7 +11,7 @@ class PushCommand extends Command
 {
     protected $signature = 'metasync:push
         {--dry-run : List the pages without sending them}
-        {--force : Overwrite meta already edited in MetaSync with the site\'s current values}';
+        {--force : Overwrite meta and redirects already in MetaSync with the site\'s current values}';
 
     protected $description = 'Push the site\'s pages and redirects to MetaSync';
 
@@ -97,17 +97,30 @@ class PushCommand extends Command
         }
 
         if ($redirects !== []) {
-            $total = ['new' => 0, 'existing' => 0, 'skipped' => 0];
+            $force = (bool) $this->option('force');
+            $total = ['new' => 0, 'existing' => 0, 'overwritten' => 0, 'skipped' => 0];
+            $forceSupported = true;
 
             foreach (array_chunk($redirects, 500) as $chunk) {
-                $result = $api->pushRedirects($chunk);
+                $result = $api->pushRedirects($chunk, $force);
+
+                if ($force && ! array_key_exists('overwritten', $result)) {
+                    $forceSupported = false;
+                }
 
                 $total['new'] += $result['new'];
                 $total['existing'] += $result['existing'];
+                $total['overwritten'] += $result['overwritten'] ?? 0;
                 $total['skipped'] += $result['skipped'] ?? 0;
             }
 
             $this->info(count($redirects)." redirects pushed — {$total['new']} new, {$total['existing']} already known.");
+
+            if ($force && ! $forceSupported) {
+                $this->error('The MetaSync server ignored --force for redirects: it predates forced redirect push. Update MetaSync and run the command again.');
+            } elseif ($force) {
+                $this->warn("{$total['overwritten']} redirects known to MetaSync were overwritten with the site's values (force push).");
+            }
 
             if ($total['skipped'] > 0) {
                 $this->warn("{$total['skipped']} redirects were skipped: the MetaSync plan redirect limit is reached.");

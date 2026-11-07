@@ -116,6 +116,48 @@ class PushCommandTest extends TestCase
         });
     }
 
+    public function test_forced_push_overwrites_redirects_known_to_metasync(): void
+    {
+        $this->app->bind(RedirectCollector::class, fn () => new class implements RedirectCollector
+        {
+            public function collect(): iterable
+            {
+                yield ['from_path' => '/old', 'to_url' => '/site-version', 'status_code' => 301];
+            }
+        });
+
+        Http::fake([
+            'https://metasync.test/api/v1/pages/push' => Http::response(['new' => 0, 'updated' => 1, 'overwritten' => 0, 'total' => 1, 'skipped' => 0]),
+            'https://metasync.test/api/v1/redirects/push' => Http::response(['new' => 0, 'existing' => 1, 'overwritten' => 1, 'total' => 1, 'skipped' => 0]),
+        ]);
+
+        $this->artisan('metasync:push', ['--force' => true])
+            ->expectsOutputToContain('1 redirects known to MetaSync were overwritten')
+            ->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'redirects/push') && $request['force'] === true);
+    }
+
+    public function test_plain_push_does_not_force_redirects(): void
+    {
+        $this->app->bind(RedirectCollector::class, fn () => new class implements RedirectCollector
+        {
+            public function collect(): iterable
+            {
+                yield ['from_path' => '/old', 'to_url' => '/new'];
+            }
+        });
+
+        Http::fake([
+            'https://metasync.test/api/v1/pages/push' => Http::response(['new' => 0, 'updated' => 0, 'total' => 0, 'skipped' => 0]),
+            'https://metasync.test/api/v1/redirects/push' => Http::response(['new' => 0, 'existing' => 1, 'total' => 1, 'skipped' => 0]),
+        ]);
+
+        $this->artisan('metasync:push')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'redirects/push') && ! isset($request['force']));
+    }
+
     public function test_dry_run_lists_redirects_without_sending(): void
     {
         $this->app->bind(RedirectCollector::class, fn () => new class implements RedirectCollector

@@ -50,7 +50,7 @@ $this->app->bind(PageCollector::class, AppPageCollector::class);
 
 ## Exposing your redirects (optional)
 
-If the site already has redirects, implement `RedirectCollector` the same way and `metasync:push` will import them into MetaSync so they can be managed there from then on. Redirects already known to MetaSync (same `from_path`) are never overwritten — MetaSync wins conflicts.
+If the site already has redirects, implement `RedirectCollector` the same way and `metasync:push` will import them into MetaSync so they can be managed there from then on. Redirects already known to MetaSync (same `from_path`) are never overwritten — MetaSync wins conflicts — unless you push with `--force` (see below).
 
 ```php
 use MetaSyncClient\Contracts\RedirectCollector;
@@ -82,7 +82,9 @@ Without a binding, push only sends pages.
 | `metasync:sync [--force]` | push + pull |
 | `metasync:webhook [url] [--remove]` | Register a webhook for instant change delivery |
 
-A plain push never overwrites meta that was edited in MetaSync — MetaSync wins conflicts, so the site cannot undo an editor's work by accident. When the site really is the source of truth (a fix applied directly in the site's database, a bulk correction, a typo such as a Cyrillic letter replaced with its Latin twin that a normal push silently keeps), run `metasync:push --force`: the site's values replace the MetaSync edits for every pushed page, each overwrite is recorded in the project's change log, and the affected pages are re-queued for delivery so the next pull refreshes the site's local cache tables (`metasync:sync --force` does both in one go). A MetaSync server that predates force push ignores the flag; the command tells you so instead of reporting zero overwrites. Redirects are not affected by `--force`: existing redirects are still never touched.
+A plain push never overwrites meta that was edited in MetaSync — MetaSync wins conflicts, so the site cannot undo an editor's work by accident. When the site really is the source of truth (a fix applied directly in the site's database, a bulk correction, a typo such as a Cyrillic letter replaced with its Latin twin that a normal push silently keeps), run `metasync:push --force`: the site's values replace the MetaSync edits for every pushed page, each overwrite is recorded in the project's change log, and the affected pages are re-queued for delivery so the next pull refreshes the site's local cache tables (`metasync:sync --force` does both in one go). `--force` covers redirects too: an existing redirect with the same `from_path` takes the site's target, status and active flag (a redirect trashed in MetaSync is restored), and the changed ones are re-queued so the next pull refreshes `metasync_redirects` — the table the `HandleRedirects` middleware serves GET requests from. A MetaSync server that predates force push ignores the flag; the command tells you so instead of reporting zero overwrites.
+
+If editors change redirects on the site itself (a CMS redirect manager), send each change with `ApiClient::pushRedirects([$redirect], force: true)` and then `SyncService::pull()`. Otherwise the middleware keeps answering GET requests with the older MetaSync value, while HEAD requests and anything that bypasses the middleware show the site's own.
 
 `metasync:pull` registers itself on the scheduler every 15 minutes as a fallback for when the webhook cannot reach the site (disable with `METASYNC_SCHEDULE_PULL=false`, change the schedule with `METASYNC_SCHEDULE_CRON`).
 

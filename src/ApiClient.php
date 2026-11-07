@@ -47,12 +47,16 @@ class ApiClient
 
     /**
      * @param  list<array<string, mixed>>  $redirects
-     * @return array{new: int, existing: int, total: int, skipped: int}
+     * @param  bool  $force  overwrite redirects MetaSync already knows (same from_path) with the site's values
+     * @return array{new: int, existing: int, overwritten?: int, total: int, skipped: int}
      */
-    public function pushRedirects(array $redirects): array
+    public function pushRedirects(array $redirects, bool $force = false): array
     {
-        /** @var array{new: int, existing: int, total: int, skipped: int} */
-        return $this->json($this->http()->post('redirects/push', ['redirects' => $redirects]));
+        /** @var array{new: int, existing: int, overwritten?: int, total: int, skipped: int} */
+        return $this->json($this->http()->post('redirects/push', array_filter([
+            'redirects' => $redirects,
+            'force' => $force ?: null,
+        ])));
     }
 
     /**
